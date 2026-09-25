@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { admin, clientFor, createTestUser, deleteTestUser, type TestUser }
+import { admin, clientFor, createTestUser, deleteTestUsers, type TestUser }
   from './helpers'
 
 describe('profiles', () => {
@@ -12,8 +12,7 @@ describe('profiles', () => {
   })
 
   afterAll(async () => {
-    await deleteTestUser(alice)
-    await deleteTestUser(bob)
+    await deleteTestUsers(alice, bob)
   })
 
   it('creates a profile automatically on signup', async () => {
