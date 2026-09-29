@@ -1,22 +1,27 @@
+import { MorningCard } from '@/components/morning-card'
+import { localDay } from '@/lib/date'
 import { createServerSupabase } from '@/lib/supabase/server'
 import { SignOutButton } from './sign-out-button'
 
-// Placeholder authenticated home. The middleware already redirects
-// unauthenticated requests to /login, so this only ever renders for a
-// signed-in user. Task 9 replaces this with the real morning card.
-export default async function Home() {
+// The middleware already redirects unauthenticated requests to /login, so
+// this only ever renders for a signed-in user.
+export default async function TodayPage() {
   const supabase = await createServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
 
+  const { data: profile } = await supabase
+    .from('profiles').select('timezone').eq('id', user!.id).single()
+
+  // Rendered server-side for the first paint; the client recomputes on mount
+  // so a phone that crosses midnight while open stays correct.
+  const day = localDay(new Date(), profile?.timezone ?? 'Europe/London')
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 dark:bg-black">
-      <main className="flex w-full max-w-sm flex-col items-center gap-4 p-6 text-center">
-        <h1 className="text-xl font-semibold">Signed in</h1>
-        <p className="text-sm text-neutral-600">
-          {user ? user.email : 'Session not found.'}
-        </p>
+    <main className="mx-auto flex max-w-md flex-1 flex-col gap-4 px-4 py-6">
+      <div className="flex justify-end">
         <SignOutButton />
-      </main>
-    </div>
+      </div>
+      <MorningCard day={day} />
+    </main>
   )
 }
