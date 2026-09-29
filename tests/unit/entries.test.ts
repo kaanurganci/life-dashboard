@@ -15,6 +15,10 @@ const weight: Metric = {
   id: 'm3', slug: 'bodyweight_kg', label: 'Bodyweight', kind: 'numeric',
   category: 'body', unit: 'kg', scale_min: null, scale_max: null, sort_order: 30,
 }
+const runDuration: Metric = {
+  id: 'm4', slug: 'run_duration_sec', label: 'Run Duration', kind: 'duration',
+  category: 'training', unit: 'sec', scale_min: null, scale_max: null, sort_order: 40,
+}
 
 describe('buildEntryPayload', () => {
   it('puts a scale value in value_num', () => {
@@ -61,6 +65,59 @@ describe('buildEntryPayload', () => {
 
   it('rejects a malformed day', () => {
     expect(() => buildEntryPayload(sleep, 7, '24/09/2026')).toThrow(/YYYY-MM-DD/)
+  })
+
+  it('rejects NaN on a scale metric before it reaches the range check', () => {
+    expect(() => buildEntryPayload(sleep, Number('abc'), '2026-09-24'))
+      .toThrow(/finite number/)
+  })
+
+  it('rejects NaN on an unbounded numeric metric', () => {
+    expect(() => buildEntryPayload(weight, Number('abc'), '2026-09-24'))
+      .toThrow(/finite number/)
+  })
+
+  it('rejects NaN on a duration metric', () => {
+    expect(() => buildEntryPayload(runDuration, Number('abc'), '2026-09-24'))
+      .toThrow(/finite number/)
+  })
+
+  it('rejects Infinity on a scale metric', () => {
+    expect(() => buildEntryPayload(sleep, Infinity, '2026-09-24'))
+      .toThrow(/finite number/)
+    expect(() => buildEntryPayload(sleep, -Infinity, '2026-09-24'))
+      .toThrow(/finite number/)
+  })
+
+  it('rejects Infinity on an unbounded numeric metric', () => {
+    expect(() => buildEntryPayload(weight, Infinity, '2026-09-24'))
+      .toThrow(/finite number/)
+    expect(() => buildEntryPayload(weight, -Infinity, '2026-09-24'))
+      .toThrow(/finite number/)
+  })
+
+  it('rejects Infinity on a duration metric', () => {
+    expect(() => buildEntryPayload(runDuration, Infinity, '2026-09-24'))
+      .toThrow(/finite number/)
+    expect(() => buildEntryPayload(runDuration, -Infinity, '2026-09-24'))
+      .toThrow(/finite number/)
+  })
+
+  it('rejects a zero occurrence', () => {
+    expect(() => buildEntryPayload(creatine, true, '2026-09-24', 0))
+      .toThrow(/positive whole number/)
+  })
+
+  it('rejects a negative occurrence', () => {
+    expect(() => buildEntryPayload(creatine, true, '2026-09-24', -1))
+      .toThrow(/positive whole number/)
+  })
+
+  it('rejects an impossible calendar date even when it matches the shape', () => {
+    expect(() => buildEntryPayload(sleep, 7, '2026-13-40'))
+      .toThrow(/real calendar date/)
+    expect(() => buildEntryPayload(sleep, 7, '2026-02-30'))
+      .toThrow(/real calendar date/)
   })
 })
 
