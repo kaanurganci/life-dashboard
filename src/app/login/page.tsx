@@ -1,9 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createBrowserSupabase } from '@/lib/supabase/client'
 
-export default function LoginPage() {
+// Fixed vocabulary of our own error codes — never Supabase's raw
+// error/error_description — surfaced by /auth/callback on redirect.
+const CALLBACK_ERROR_MESSAGES: Record<string, string> = {
+  link_expired: 'That sign-in link expired. Request a new one below.',
+  missing_code: 'That sign-in link was invalid. Request a new one below.',
+  exchange_failed: 'Sign-in failed. Request a new one below.',
+  auth_failed: 'Sign-in failed. Request a new one below.',
+}
+
+function LoginForm() {
+  const searchParams = useSearchParams()
+  const callbackError = searchParams.get('error')
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -53,7 +65,20 @@ export default function LoginPage() {
           Send link
         </button>
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+        {!error && callbackError && (
+          <p role="alert" className="text-sm text-red-600">
+            {CALLBACK_ERROR_MESSAGES[callbackError] ?? 'Sign-in failed. Request a new one below.'}
+          </p>
+        )}
       </form>
     </main>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }
