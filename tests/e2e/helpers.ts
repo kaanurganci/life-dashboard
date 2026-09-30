@@ -9,14 +9,14 @@ import type { BrowserContext, Page } from '@playwright/test'
 // propagated to it. dotenv does not override already-set vars.
 config({ path: '.env.local' })
 
-const url = process.env.SUPABASE_DEV_URL!
-const anonKey = process.env.SUPABASE_DEV_ANON_KEY!
-const serviceKey = process.env.SUPABASE_DEV_SERVICE_ROLE_KEY!
+const url = process.env.SUPABASE_TEST_URL!
+const anonKey = process.env.SUPABASE_TEST_ANON_KEY!
+const serviceKey = process.env.SUPABASE_TEST_SERVICE_ROLE_KEY!
 
 if (!url || !anonKey || !serviceKey) {
   throw new Error(
-    'e2e tests need SUPABASE_DEV_URL, SUPABASE_DEV_ANON_KEY and ' +
-      'SUPABASE_DEV_SERVICE_ROLE_KEY in .env.local',
+    'e2e tests need SUPABASE_TEST_URL, SUPABASE_TEST_ANON_KEY and ' +
+      'SUPABASE_TEST_SERVICE_ROLE_KEY in .env.local',
   )
 }
 

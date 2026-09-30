@@ -22,7 +22,16 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000/login',
-    reuseExistingServer: true,
+    // NEVER reuse a server someone else started: a dev server launched by hand
+    // is pointed at the LIVE project by .env.local, and reusing it would run
+    // the e2e suite -- which creates and deletes auth users -- against real data.
+    reuseExistingServer: false,
+    // Shell env beats .env.local in Next, so this forces the app under test onto
+    // the empty test project regardless of what .env.local says.
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_TEST_URL!,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.SUPABASE_TEST_ANON_KEY!,
+    },
     timeout: 120_000,
   },
 })
