@@ -36,6 +36,13 @@ describe('createQueryClient', () => {
 
     expect(retry(3, new TypeError('Failed to fetch'))).toBe(false)
   })
+  // Regression guard: without this, a query restored from IndexedDB inside its
+  // staleTime window is treated as fresh and never refetched, so registry changes
+  // stay invisible for up to an hour and survive a hard refresh.
+  it('always revalidates a restored query on mount', () => {
+    const client = createQueryClient()
+    expect(client.getDefaultOptions().queries?.refetchOnMount).toBe('always')
+  })
 })
 
 describe('idbPersister', () => {

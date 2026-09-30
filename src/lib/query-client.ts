@@ -21,6 +21,15 @@ export function createQueryClient() {
         gcTime: 1000 * 60 * 60 * 24 * 7,
         retry: 2,
         refetchOnWindowFocus: true,
+        // Queries are persisted to IndexedDB alongside the mutation queue, so a
+        // restored result can be served instantly — which is what makes the app
+        // usable with no signal. But a restored result inside its staleTime window
+        // is treated as fresh and never refetched, so a registry change made
+        // elsewhere (seeding metrics, adding a supplement in the dashboard) stayed
+        // invisible for up to an hour, surviving even a hard refresh because
+        // IndexedDB does. 'always' keeps the instant paint from cache and
+        // revalidates in the background on every mount.
+        refetchOnMount: 'always',
       },
       mutations: {
         gcTime: 1000 * 60 * 60 * 24 * 7,
