@@ -23,6 +23,14 @@ describe('isProtectedPath', () => {
     expect(isProtectedPath('/api/keep-warm')).toBe(false)
   })
 
+  it('does not exempt paths beneath the cron route', () => {
+    expect(isProtectedPath('/api/keep-warm/status')).toBe(true)
+  })
+
+  it('does not exempt a path that merely starts with the cron route\'s name', () => {
+    expect(isProtectedPath('/api/keep-warmX')).toBe(true)
+  })
+
   it('still protects other API routes by default', () => {
     expect(isProtectedPath('/api/anything-else')).toBe(true)
   })
