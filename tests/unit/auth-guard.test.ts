@@ -18,4 +18,12 @@ describe('isProtectedPath', () => {
     expect(isProtectedPath('/icons/icon-192.png')).toBe(false)
     expect(isProtectedPath('/_next/static/chunk.js')).toBe(false)
   })
+
+  it('leaves the cron route open, since it authorizes itself via CRON_SECRET', () => {
+    expect(isProtectedPath('/api/keep-warm')).toBe(false)
+  })
+
+  it('still protects other API routes by default', () => {
+    expect(isProtectedPath('/api/anything-else')).toBe(true)
+  })
 })
