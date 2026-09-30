@@ -3,6 +3,7 @@
 import { useMutation, useMutationState, useQueryClient }
   from '@tanstack/react-query'
 import { buildEntryPayload } from '@/lib/entries'
+import { applyOptimisticEntry, rollbackEntry } from '@/lib/optimistic'
 import type { Metric, MetricEntry } from '@/lib/schemas'
 
 export const LOG_METRIC_MUTATION_KEY = ['log-metric']
@@ -18,20 +19,18 @@ export function useLogMetric(day: string) {
       await queryClient.cancelQueries({ queryKey: ['entries', day] })
       const previous = queryClient.getQueryData<MetricEntry[]>(['entries', day])
 
-      queryClient.setQueryData<MetricEntry[]>(['entries', day], (old = []) => {
-        const rest = old.filter(
-          (e) => !(e.metric_id === payload.metric_id
-                   && e.occurrence === payload.occurrence),
-        )
-        return [...rest, payload]
-      })
+      queryClient.setQueryData<MetricEntry[]>(['entries', day], (old = []) =>
+        applyOptimisticEntry(old, payload))
 
       return { previous }
     },
-    onError: (_error, _payload, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(['entries', day], context.previous)
-      }
+    // Reverts only this write's own slot, and only if a later write has not
+    // already replaced it. Restoring the whole snapshot would lose a correction
+    // made while this write was still in flight — invisible online, because the
+    // next refetch repairs it, but persistent offline.
+    onError: (_error, payload, context) => {
+      queryClient.setQueryData<MetricEntry[]>(['entries', day], (current = []) =>
+        rollbackEntry(current, payload, context?.previous))
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['entries', day] })

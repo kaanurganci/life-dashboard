@@ -28,6 +28,11 @@ export function useDayLog(day: string) {
         .from('metric_entries')
         .select('id, metric_id, logged_on, occurrence, value_num, value_bool, value_text')
         .eq('logged_on', day)
+        // The morning card shows the canonical occurrence-1 reading, matching
+        // v_daily_summary. Filtering here rather than client-side avoids pulling
+        // rows down only to discard them. A future multi-occurrence UI must
+        // change this query, not just the map below.
+        .eq('occurrence', 1)
       if (error) throw error
       return data as MetricEntry[]
     },
@@ -35,7 +40,7 @@ export function useDayLog(day: string) {
 
   const byMetric = new Map<string, MetricEntry>()
   for (const entry of entries.data ?? []) {
-    if (entry.occurrence === 1) byMetric.set(entry.metric_id, entry)
+    byMetric.set(entry.metric_id, entry)
   }
 
   return {
