@@ -8,7 +8,7 @@ function redirectToLogin(request: NextRequest) {
   return NextResponse.redirect(url)
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   // Evaluated before the guarded region below so the fail-closed decision
