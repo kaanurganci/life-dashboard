@@ -5,13 +5,18 @@ import { get, set, del } from 'idb-keyval'
 const CACHE_KEY = 'life-dashboard-query-cache'
 
 /** Postgres error classes that will never succeed on a retry. */
-const PERMANENT_CODES = new Set([
+export const PERMANENT_CODES = new Set([
   '23514', // check_violation
   '23505', // unique_violation
   '23503', // foreign_key_violation
   '42501', // insufficient_privilege (RLS)
   'P0001', // raise_exception, i.e. our validation trigger
 ])
+
+/** 1s, 2s, 4s ... capped at 30s. */
+export function mutationRetryDelay(failureCount: number): number {
+  return Math.min(1000 * 2 ** failureCount, 30_000)
+}
 
 export function createQueryClient() {
   return new QueryClient({
@@ -33,13 +38,15 @@ export function createQueryClient() {
       },
       mutations: {
         gcTime: 1000 * 60 * 60 * 24 * 7,
-        // A rejected write must leave the queue; only transport failures wait
-        // for reconnection.
-        retry: (failureCount: number, error: unknown) => {
+        // A rejected write must leave the queue. A transport failure (no
+        // Postgres code) is never a verdict on the data, and a weak-signal
+        // device reports online so TanStack never pauses it: give up after N
+        // tries and the write is destroyed. So retry indefinitely, backing off.
+        retry: (_failureCount: number, error: unknown) => {
           const code = (error as { code?: string } | null)?.code
-          if (code && PERMANENT_CODES.has(code)) return false
-          return failureCount < 3
+          return !(code && PERMANENT_CODES.has(code))
         },
+        retryDelay: mutationRetryDelay,
       },
     },
   })

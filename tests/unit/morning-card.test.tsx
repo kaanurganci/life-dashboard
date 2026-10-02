@@ -16,6 +16,7 @@ const metrics: Metric[] = [
 ]
 
 const log = vi.fn()
+let failedCount = 0
 let entries = new Map<string, MetricEntry>()
 let yesterdayEntries = new Map<string, MetricEntry>()
 
@@ -28,19 +29,35 @@ vi.mock('@/hooks/use-day-log', () => ({
 }))
 
 vi.mock('@/hooks/use-log-metric', () => ({
-  useLogMetric: () => ({ log, pendingCount: 0 }),
+  useLogMetric: () => ({ log, pendingCount: 0, failedCount }),
   LOG_METRIC_MUTATION_KEY: ['log-metric'],
 }))
 
+vi.mock('@/hooks/use-today', () => ({ useToday: (seed: string) => seed }))
+
 beforeEach(() => {
   log.mockClear()
+  failedCount = 0
   entries = new Map()
   yesterdayEntries = new Map()
 })
 
 describe('MorningCard', () => {
+  it('says plainly when writes failed to save', () => {
+    failedCount = 2
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('2 entries failed to save')
+  })
+
+  it('shows no failure notice when nothing failed', () => {
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
+
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('renders a control for every active metric', () => {
-    render(<MorningCard day="2026-09-24" />)
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
 
     expect(screen.getByRole('slider', { name: /sleep quality/i })).toBeVisible()
     expect(screen.getByRole('slider', { name: /morning readiness/i })).toBeVisible()
@@ -49,7 +66,7 @@ describe('MorningCard', () => {
 
   it('logs a habit when toggled', async () => {
     const user = userEvent.setup()
-    render(<MorningCard day="2026-09-24" />)
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
 
     await user.click(screen.getByRole('switch', { name: /creatine/i }))
 
@@ -64,7 +81,7 @@ describe('MorningCard', () => {
       value_num: null, value_bool: true, value_text: null,
     })
     const user = userEvent.setup()
-    render(<MorningCard day="2026-09-24" />)
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
 
     const toggle = screen.getByRole('switch', { name: /creatine/i })
     expect(toggle).toBeChecked()
@@ -80,14 +97,14 @@ describe('MorningCard', () => {
       metric_id: 'm1', logged_on: '2026-09-24', occurrence: 1,
       value_num: 7, value_bool: null, value_text: null,
     })
-    render(<MorningCard day="2026-09-24" />)
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
 
     expect(screen.getByRole('slider', { name: /sleep quality/i }))
       .toHaveValue('7')
   })
 
   it('commits once per drag gesture, on release', () => {
-    render(<MorningCard day="2026-09-24" />)
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
     const slider = screen.getByRole('slider', { name: /sleep quality/i })
 
     fireEvent.pointerDown(slider)
@@ -103,7 +120,7 @@ describe('MorningCard', () => {
   })
 
   it('commits a keyboard adjustment on keyup', () => {
-    render(<MorningCard day="2026-09-24" />)
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
     const slider = screen.getByRole('slider', { name: /sleep quality/i })
 
     slider.focus()
@@ -123,7 +140,7 @@ describe('MorningCard', () => {
       value_num: null, value_bool: true, value_text: null,
     })
     const user = userEvent.setup()
-    render(<MorningCard day="2026-09-24" />)
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
 
     await user.click(screen.getByRole('button', { name: /same as yesterday/i }))
 
@@ -141,7 +158,7 @@ describe('MorningCard', () => {
       metric_id: 'm3', logged_on: '2026-09-24', occurrence: 1,
       value_num: null, value_bool: true, value_text: null,
     })
-    render(<MorningCard day="2026-09-24" />)
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
 
     expect(screen.getByText('1 / 1')).toBeVisible()
   })

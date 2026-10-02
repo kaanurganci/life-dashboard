@@ -12,3 +12,16 @@ export function PendingBadge({ count }: { count: number }) {
     </p>
   )
 }
+
+export function FailedBadge({ count }: { count: number }) {
+  if (count === 0) return null
+
+  return (
+    <p
+      role="alert"
+      className="rounded-full bg-red-100 px-3 py-1 text-xs text-red-900"
+    >
+      {count} {count === 1 ? 'entry' : 'entries'} failed to save
+    </p>
+  )
+}
