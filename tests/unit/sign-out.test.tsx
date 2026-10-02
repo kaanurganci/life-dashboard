@@ -69,7 +69,10 @@ describe('SignOutButton', () => {
   // A mounted observer rebuilds and refetches a query as soon as the cache is
   // cleared. If that happens while the old session is still live, user A's data
   // is fetched (and re-persisted) after sign-out began.
-  it('does not let a mounted observer refetch under the old session', async () => {
+  // A guard on ordering, not a proof of the race: jsdom does not reproduce the
+  // refetch-on-clear under the old order, so the order assertion above is what
+  // actually pins the fix.
+  it('guard: no refetch under the old session with an observer mounted', async () => {
     const fetchedWhileSignedIn: boolean[] = []
     function Observer() {
       useQuery({

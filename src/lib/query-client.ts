@@ -23,7 +23,10 @@ export const PERMANENT_CODES = new Set([
 /**
  * An allowlist, not a blocklist. Transient means: no Postgres code at all (a
  * genuine transport failure; supabase-js reports those with an empty code), or
- * a class that describes the server's state rather than the data. Unknown codes
+ * a class that describes the server's state rather than the data (including
+ * PostgREST's 503-class cold-start codes). An expired JWT is NOT classified
+ * here: writeEntry refreshes the session and retries, and treats a dead
+ * session as permanent. Unknown codes
  * (PGRST*, 22xxx, 23502, auth errors...) are permanent: with the per-slot
  * mutation scope, a write that can never succeed would otherwise block its slot
  * forever.
@@ -38,6 +41,9 @@ export function isTransientError(error: unknown): boolean {
     || code === '57P01' // admin shutdown
     || code === '40001' // serialization failure
     || code === '40P01' // deadlock detected
+    || code === '57014' // statement timeout
+    || code === '55P03' // lock not available
+    || /^PGRST00[0-3]$/.test(code) // db connection, pool timeout, schema cache loading
 }
 
 /** 1s, 2s, 4s ... capped at 30s. */

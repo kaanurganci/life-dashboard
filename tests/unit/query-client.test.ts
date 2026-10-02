@@ -71,6 +71,18 @@ describe('createQueryClient', () => {
     expect(isTransientError(null)).toBe(true)
   })
 
+  // Cold start of a paused free-tier project, and slow-but-healthy queries.
+  it.each(['PGRST000', 'PGRST001', 'PGRST002', 'PGRST003', '57014', '55P03'])(
+    'treats the cold-start/timeout code %s as transient', (code) => {
+      expect(isTransientError(Object.assign(new Error('x'), { code }))).toBe(true)
+    })
+
+  it('still gives up on a genuine constraint violation, and on PGRST004+', () => {
+    for (const code of ['23514', '23505', 'P0001', 'PGRST004', 'PGRST100']) {
+      expect(isTransientError(Object.assign(new Error('x'), { code }))).toBe(false)
+    }
+  })
+
   it('backs off exponentially, capped at 30 seconds', () => {
     expect(mutationRetryDelay(0)).toBe(1000)
     expect(mutationRetryDelay(1)).toBe(2000)

@@ -38,6 +38,7 @@ vi.mock('@/hooks/use-today', () => ({ useToday: (seed: string) => ({ day: seed, 
 beforeEach(() => {
   log.mockClear()
   failedCount = 0
+  log.mockReturnValue(true)
   entries = new Map()
   yesterdayEntries = new Map()
 })
@@ -48,6 +49,39 @@ describe('MorningCard', () => {
     render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('2 entries failed to save')
+  })
+
+  it('says so when a tap was dropped because the day rolled over', async () => {
+    log.mockReturnValue(false)
+    const user = userEvent.setup()
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
+
+    await user.click(screen.getByRole('switch', { name: /creatine/i }))
+
+    expect(screen.getByText(/new day/i)).toBeVisible()
+  })
+
+  it('says so, once, when same-as-yesterday is dropped after a rollover', async () => {
+    log.mockReturnValue(false)
+    yesterdayEntries.set('m3', {
+      metric_id: 'm3', logged_on: '2026-09-23', occurrence: 1,
+      value_num: null, value_bool: true, value_text: null,
+    })
+    const user = userEvent.setup()
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
+
+    await user.click(screen.getByRole('button', { name: /same as yesterday/i }))
+
+    expect(screen.getAllByText(/new day/i)).toHaveLength(1)
+  })
+
+  it('shows no rollover notice when taps are accepted', async () => {
+    const user = userEvent.setup()
+    render(<MorningCard initialDay="2026-09-24" timeZone="Europe/London" />)
+
+    await user.click(screen.getByRole('switch', { name: /creatine/i }))
+
+    expect(screen.queryByText(/new day/i)).toBeNull()
   })
 
   it('shows no failure notice when nothing failed', () => {

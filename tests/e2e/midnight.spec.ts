@@ -27,7 +27,7 @@ test.describe('day rollover', () => {
     user = undefined
   })
 
-  for (const resume of ['visibilitychange and focus', 'the interval backstop'] as const) {
+  for (const resume of ['visibilitychange and focus', 'timers alone, no events fired'] as const) {
     test(`logs onto the new day after midnight passes (${resume})`, async ({ page, context }) => {
       user = await signInAsFreshUser(page, context)
 
@@ -49,7 +49,7 @@ test.describe('day rollover', () => {
         .toEqual([`${day1}:true`])
 
       // The phone sat in a pocket overnight, then the app came forward.
-      if (resume === 'the interval backstop') {
+      if (resume === 'timers alone, no events fired') {
         await page.clock.fastForward('24:00:00')
         await page.clock.runFor('01:00')
       } else {

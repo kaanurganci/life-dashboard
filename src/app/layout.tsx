@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { resolveUserId } from "@/lib/auth-user";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,7 +28,7 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const supabase = await createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const userId = await resolveUserId(supabase);
 
   return (
     <html
@@ -35,8 +36,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {/* Keyed by user so a different account gets a fresh client and cache. */}
-        <Providers key={user?.id ?? "anon"} userId={user?.id ?? null}>
+        <Providers userId={userId}>
           {children}
         </Providers>
       </body>
