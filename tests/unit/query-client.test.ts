@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { createQueryClient, idbPersister, mutationRetryDelay, PERMANENT_CODES } from '@/lib/query-client'
+import {
+  createQueryClient, createIdbPersister, isTransientError, mutationRetryDelay,
+  PERMANENT_CODES,
+} from '@/lib/query-client'
 
 const store = new Map<string, unknown>()
 
@@ -47,6 +50,27 @@ describe('createQueryClient', () => {
     expect(retry(50, Object.assign(new Error('rejected'), { code }))).toBe(false)
   })
 
+  // The default must be "give up": with the per-slot scope, a write that can
+  // never succeed would otherwise block its habit permanently.
+  it.each(['PGRST116', 'PGRST301', '22P02', '22003', '23502', '28000', 'XX000', 'refresh_token_not_found'])(
+    'treats an unrecognised code (%s) as permanent', (code) => {
+      expect(isTransientError(Object.assign(new Error('x'), { code }))).toBe(false)
+      const retry = createQueryClient().getDefaultOptions().mutations?.retry as
+        (n: number, e: Error) => boolean
+      expect(retry(0, Object.assign(new Error('x'), { code }))).toBe(false)
+    })
+
+  it.each(['08000', '08006', '53300', '57P01', '40001', '40P01'])(
+    'treats %s as transient', (code) => {
+      expect(isTransientError(Object.assign(new Error('x'), { code }))).toBe(true)
+    })
+
+  it('treats no code, or the empty code supabase-js gives a fetch failure, as transient', () => {
+    expect(isTransientError(new TypeError('Failed to fetch'))).toBe(true)
+    expect(isTransientError(Object.assign(new Error('x'), { code: '' }))).toBe(true)
+    expect(isTransientError(null)).toBe(true)
+  })
+
   it('backs off exponentially, capped at 30 seconds', () => {
     expect(mutationRetryDelay(0)).toBe(1000)
     expect(mutationRetryDelay(1)).toBe(2000)
@@ -66,26 +90,33 @@ describe('createQueryClient', () => {
   })
 })
 
-describe('idbPersister', () => {
+describe('createIdbPersister', () => {
   beforeEach(() => store.clear())
+  const blob = (timestamp: number) => ({
+    buster: '', timestamp, clientState: { mutations: [], queries: [] },
+  })
 
   it('round-trips a client through IndexedDB', async () => {
-    await idbPersister.persistClient({
-      buster: '', timestamp: 1, clientState: {
-        mutations: [], queries: [],
-      },
-    })
-
-    const restored = await idbPersister.restoreClient()
-    expect(restored?.timestamp).toBe(1)
+    const p = createIdbPersister('user-a')
+    await p.persistClient(blob(1))
+    expect((await p.restoreClient())?.timestamp).toBe(1)
   })
 
   it('removes the stored client', async () => {
-    await idbPersister.persistClient({
-      buster: '', timestamp: 2, clientState: { mutations: [], queries: [] },
-    })
-    await idbPersister.removeClient()
+    const p = createIdbPersister('user-a')
+    await p.persistClient(blob(2))
+    await p.removeClient()
+    expect(await p.restoreClient()).toBeUndefined()
+  })
 
-    expect(await idbPersister.restoreClient()).toBeUndefined()
+  it('never lets one user restore another account cache or outbox', async () => {
+    await createIdbPersister('user-a').persistClient(blob(3))
+    expect(await createIdbPersister('user-b').restoreClient()).toBeUndefined()
+  })
+
+  it('deletes the legacy global key rather than serving it to anyone', async () => {
+    store.set('life-dashboard-query-cache', blob(4))
+    expect(await createIdbPersister('user-a').restoreClient()).toBeUndefined()
+    expect(store.has('life-dashboard-query-cache')).toBe(false)
   })
 })

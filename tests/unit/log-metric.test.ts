@@ -4,6 +4,7 @@ import {
   enqueueLogMetric, registerLogMetricDefaults, LOG_METRIC_MUTATION_KEY,
 } from '@/lib/log-metric'
 import { createQueryClient } from '@/lib/query-client'
+import { shouldDehydrateMutation } from '@/lib/outbox'
 import type { MetricEntry } from '@/lib/schemas'
 
 const entry = (metric_id: string, value: boolean, logged_on = '2026-09-24'): MetricEntry => ({
@@ -89,7 +90,7 @@ describe('callbacks survive a reload', () => {
     void enqueueLogMetric(before, entry('creatine', true))
     await sleep(0)
     const persisted = JSON.parse(JSON.stringify(
-      dehydrate(before, { shouldDehydrateMutation: (m) => m.state.status === 'pending' }),
+      dehydrate(before, { shouldDehydrateMutation }),
     ))
     expect(persisted.mutations).toHaveLength(1)
     expect(persisted.mutations[0].scope?.id).toContain('creatine')

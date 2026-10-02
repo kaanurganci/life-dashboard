@@ -33,7 +33,7 @@ vi.mock('@/hooks/use-log-metric', () => ({
   LOG_METRIC_MUTATION_KEY: ['log-metric'],
 }))
 
-vi.mock('@/hooks/use-today', () => ({ useToday: (seed: string) => seed }))
+vi.mock('@/hooks/use-today', () => ({ useToday: (seed: string) => ({ day: seed, refresh: () => seed }) }))
 
 beforeEach(() => {
   log.mockClear()

@@ -1,14 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
-import { createQueryClient, idbPersister } from '@/lib/query-client'
+import { createQueryClient, createIdbPersister, nullPersister } from '@/lib/query-client'
 import { createBrowserSupabase } from '@/lib/supabase/client'
 import { ENTRY_CONFLICT_TARGET } from '@/lib/entries'
 import { registerLogMetricDefaults } from '@/lib/log-metric'
+import { resumeRestoredMutations, shouldDehydrateMutation } from '@/lib/outbox'
 import type { MetricEntry } from '@/lib/schemas'
 
-export function Providers({ children }: { children: React.ReactNode }) {
+/**
+ * `userId` binds the persisted cache (and its outbox) to one account. The
+ * layout keys this component by it, so a different user gets a fresh client
+ * and a different IndexedDB key rather than inheriting anything.
+ */
+export function Providers({
+  userId, children,
+}: { userId: string | null; children: React.ReactNode }) {
   const [queryClient] = useState(() => {
     const client = createQueryClient()
 
@@ -25,25 +33,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return client
   })
 
+  const persister = useMemo(
+    () => (userId ? createIdbPersister(userId) : nullPersister),
+    [userId],
+  )
+
   return (
     <PersistQueryClientProvider
       client={queryClient}
       persistOptions={{
-        persister: idbPersister,
-        dehydrateOptions: {
-          // Persisting unsettled mutations is what makes this an outbox. Paused
-          // is not enough: a weak-signal write reports online, so it sits in a
-          // retry backoff as 'pending' and would be lost on reload.
-          shouldDehydrateMutation: (m) => m.state.status === 'pending',
-        },
+        persister,
+        dehydrateOptions: { shouldDehydrateMutation },
       }}
-      onSuccess={() => {
-        // A restored mutation has no retryer, so continue() re-executes it
-        // (scoped, so in its original per-slot order). Offline it just pauses.
-        for (const m of queryClient.getMutationCache().getAll()) {
-          if (m.state.status === 'pending') void m.continue().catch(() => {})
-        }
-      }}
+      onSuccess={() => resumeRestoredMutations(queryClient)}
     >
       {children}
     </PersistQueryClientProvider>

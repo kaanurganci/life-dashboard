@@ -23,3 +23,17 @@ export function previousDay(day: string): string {
   at.setUTCDate(at.getUTCDate() - 1)
   return at.toISOString().slice(0, 10)
 }
+
+/**
+ * Milliseconds from `at` until the next local midnight in `timeZone`. Computed
+ * from the wall-clock time of day, so it is approximate on a daylight-saving
+ * change day; callers re-check the real day when it fires, so that is safe.
+ */
+export function msUntilNextDay(at: Date = new Date(), timeZone = DEFAULT_TIMEZONE): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(at)
+  const n = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0)
+  const elapsed = ((n('hour') * 60 + n('minute')) * 60 + n('second')) * 1000 + at.getMilliseconds()
+  return 24 * 60 * 60 * 1000 - elapsed
+}

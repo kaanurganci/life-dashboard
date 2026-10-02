@@ -3,26 +3,30 @@
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { createBrowserSupabase } from '@/lib/supabase/client'
-import { idbPersister } from '@/lib/query-client'
+import { createIdbPersister } from '@/lib/query-client'
 
-export function SignOutButton() {
+export function SignOutButton({ userId }: { userId: string }) {
   const router = useRouter()
   const queryClient = useQueryClient()
 
   async function signOut() {
-    // The persisted cache is keyed globally, not per user, so a second account
-    // on this browser would inherit the first one's metrics and entries. Clear
-    // memory and IndexedDB first. A failure here must not block sign-out: the
-    // in-memory clear has already run, and staying signed in is worse.
+    // Sign out FIRST. Clearing while the session is live lets mounted
+    // observers (the day tick, mutation-state subscribers) refetch under the
+    // old user's session and the provider re-persist the result, and in-flight
+    // retryers survive clear() and can repopulate it.
+    const supabase = createBrowserSupabase()
+    await supabase.auth.signOut()
+
+    // The persisted cache is already bound to this user's id, so another account
+    // cannot inherit it; removing it is for privacy on a shared device. A failure
+    // here must not strand the user: they are signed out either way.
     try {
       queryClient.clear()
-      await idbPersister.removeClient()
+      await createIdbPersister(userId).removeClient()
     } catch (error) {
       console.error('failed to clear the local cache on sign-out', error)
     }
 
-    const supabase = createBrowserSupabase()
-    await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
   }

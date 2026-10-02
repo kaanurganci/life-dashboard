@@ -13,10 +13,10 @@ import { PendingBadge, FailedBadge } from '@/components/pending-badge'
 export function MorningCard({
   initialDay, timeZone,
 }: { initialDay: string; timeZone: string }) {
-  const day = useToday(initialDay, timeZone)
+  const { day, refresh } = useToday(initialDay, timeZone)
   const { metrics, entries, isLoading } = useDayLog(day)
   const { entries: yesterdayEntries } = useDayLog(previousDay(day))
-  const { log, pendingCount, failedCount } = useLogMetric(day)
+  const { log, pendingCount, failedCount } = useLogMetric(day, refresh)
 
   if (isLoading) {
     return <p className="p-6 text-sm text-neutral-500">Loading…</p>

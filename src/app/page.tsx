@@ -21,7 +21,7 @@ export default async function TodayPage() {
   return (
     <main className="mx-auto flex max-w-md flex-1 flex-col gap-4 px-4 py-6">
       <div className="flex justify-end">
-        <SignOutButton />
+        <SignOutButton userId={user!.id} />
       </div>
       <MorningCard initialDay={day} timeZone={timeZone} />
     </main>
