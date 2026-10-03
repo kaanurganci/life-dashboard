@@ -1,11 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { isAuthRetryableFetchError } from '@supabase/supabase-js'
+import { isAuthApiError, isAuthSessionMissingError } from '@supabase/supabase-js'
 import { ENTRY_CONFLICT_TARGET } from '@/lib/entries'
 import type { Database } from '@/types/database'
 import type { MetricEntry } from '@/lib/schemas'
 
 /** Code on the error thrown when the session is dead and cannot be refreshed. */
 export const SIGNED_OUT_CODE = 'APP_SIGNED_OUT'
+
+function isSessionOver(error: unknown): boolean {
+  if (isAuthSessionMissingError(error)) return true
+  return isAuthApiError(error) && [400, 401, 403].includes(error.status)
+}
 
 function isExpiredToken(error: { code?: string }, status: number): boolean {
   return error.code === 'PGRST301' || status === 401
@@ -18,8 +23,9 @@ function isExpiredToken(error: { code?: string }, status: number): boolean {
  * a token that will never become valid (transient).
  *
  *  - refresh succeeds           -> retry the write once with the fresh token
- *  - refresh fails on transport -> thrown WITHOUT a code, so it is retried
- *  - refresh fails otherwise    -> the user is genuinely signed out: permanent
+ *  - refresh says session over  -> (AuthSessionMissing, or AuthApiError
+ *                                  400/401/403) permanent
+ *  - any other refresh failure  -> thrown WITHOUT a code, so it is retried
  *  - still rejected after it    -> thrown with its own code (PGRST301 is
  *                                  permanent), so a bad token cannot spin
  */
@@ -38,11 +44,19 @@ export async function writeEntry(
   if (error && isExpiredToken(error, status)) {
     const { data, error: refreshError } = await supabase.auth.refreshSession()
 
-    if (refreshError && isAuthRetryableFetchError(refreshError)) {
-      throw new TypeError('could not reach the auth server to refresh the session')
+    // Only "this session is over" is permanent. Anything else (429 when many
+    // slots refresh at once after a long offline stretch, 5xx, fetch failures,
+    // unknown shapes) is recoverable, so it is thrown WITHOUT a code and retried.
+    if (refreshError) {
+      if (isSessionOver(refreshError)) {
+        throw Object.assign(new Error('signed out: session cannot be refreshed'), {
+          code: SIGNED_OUT_CODE,
+        })
+      }
+      throw new TypeError('could not refresh the session; will retry')
     }
-    if (refreshError || !data.session) {
-      throw Object.assign(new Error('signed out: session cannot be refreshed'), {
+    if (!data.session) {
+      throw Object.assign(new Error('signed out: no session after refresh'), {
         code: SIGNED_OUT_CODE,
       })
     }

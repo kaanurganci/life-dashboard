@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AuthRetryableFetchError, AuthApiError } from '@supabase/supabase-js'
+import { AuthRetryableFetchError, AuthApiError, AuthSessionMissingError, AuthUnknownError } from '@supabase/supabase-js'
 import { writeEntry, SIGNED_OUT_CODE } from '@/lib/write-entry'
 import { isTransientError } from '@/lib/query-client'
 import type { MetricEntry } from '@/lib/schemas'
@@ -63,6 +63,44 @@ describe('writeEntry', () => {
     }))
     const err = await writeEntry(client, payload).catch((e) => e)
     expect(err.code).toBe(SIGNED_OUT_CODE)
+    expect(isTransientError(err)).toBe(false)
+  })
+
+  it.each([429, 500, 503])('a %s during refresh is retried, not discarded', async (status) => {
+    const { client } = fakeSupabase([expired], async () => ({
+      data: { session: null },
+      error: new AuthApiError('busy', status, 'over_request_rate_limit'),
+    }))
+    const err = await writeEntry(client, payload).catch((e) => e)
+    expect(err.code).toBeUndefined()
+    expect(isTransientError(err)).toBe(true)
+  })
+
+  it('an unrecognised refresh error is retried, not discarded', async () => {
+    const { client } = fakeSupabase([expired], async () => ({
+      data: { session: null },
+      error: new AuthUnknownError('???', new Error('x')),
+    }))
+    const err = await writeEntry(client, payload).catch((e) => e)
+    expect(isTransientError(err)).toBe(true)
+  })
+
+  it.each([400, 401, 403])('a %s AuthApiError during refresh is permanent', async (status) => {
+    const { client, upsert } = fakeSupabase([expired], async () => ({
+      data: { session: null },
+      error: new AuthApiError('nope', status, 'bad_jwt'),
+    }))
+    const err = await writeEntry(client, payload).catch((e) => e)
+    expect(err.code).toBe(SIGNED_OUT_CODE)
+    expect(isTransientError(err)).toBe(false)
+    expect(upsert).toHaveBeenCalledTimes(1)
+  })
+
+  it('AuthSessionMissingError during refresh is permanent', async () => {
+    const { client } = fakeSupabase([expired], async () => ({
+      data: { session: null }, error: new AuthSessionMissingError(),
+    }))
+    const err = await writeEntry(client, payload).catch((e) => e)
     expect(isTransientError(err)).toBe(false)
   })
 
